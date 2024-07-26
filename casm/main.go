@@ -52,10 +52,10 @@ func main() {
 	}
 
 	if ind := slices.Index(os.Args, "-h"); ind != -1 {
-		fmt.Println("usage: casm [files...]")
+		fmt.Println("usage: casm [files...] [-o [path]] [-t]")
 		return
 	} else if ind := slices.Index(os.Args, "--help"); ind != -1 {
-		fmt.Println("usage: casm [files...]")
+		fmt.Println("usage: casm [files...] [-o [path]] [-t]")
 		return
 	}
 

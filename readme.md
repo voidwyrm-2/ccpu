@@ -7,7 +7,7 @@ See [architecture.md](./architecture.md) for, you know, the CPU architecture<br>
 See [call_codes.md](./call_codes.md) for the CPU call codes for syscalls
 
 The `casm/` folder is the assembler<br>
-`cpu.c` and `lib.h` is the CPU itself
+`cpu.c` and `lib.h` is the CPU itself<br>
 The `asm` folder contains all the assembly I wrote for the CPU(`.asm` files contain plaintext source code, `.bin` files contain the assembled code)
 
 ## Installation
@@ -15,7 +15,7 @@ The `asm` folder contains all the assembly I wrote for the CPU(`.asm` files cont
 **Installing Casm**
 * Check if you have Go with `go version`
     > If not, either download it with Homebrew(`brew update && brew install go`) or from [Go's website](https://go.dev)
-* Run `go install github.com/voidwyrm-2/ccpu@latest`
+* Run `go install github.com/voidwyrm-2/ccpu/casm@latest`; use `casm -h` for help with assembling files
 
 **Installing The CCPU**<br>
 The CCPU must be built from source because I'm lazy and it's not that hard<br>
