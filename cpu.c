@@ -13,27 +13,27 @@ int difference(int a, int b) {
 
 void cpu(int* code) {
     int* registers = malloc(sizeof(int) * 256);
-    int* memory = malloc(sizeof(int) * 1024);
     IntStack stack = NewIntStack();
     IntStack addrStack = NewIntStack();
 
     int pc = 0;
     while (1) {
-        // printf("b1: %d, b2: %d, b3: %d, b4: %d\n", code[pc], code[pc + 1],
-        //        code[pc + 2], code[pc + 3]);
+        // printf("r0: %d, r1: %d, r2: %d, r3: %d\n", registers[8],
+        // registers[9],
+        //        registers[10], registers[11]);
         switch (code[pc]) {
-            // add
+            // mov
             case 0:
+                registers[code[pc + 3]] =
+                    code[pc + 3] == 0 ? 0 : (code[pc + 1] << 8) + code[pc + 2];
+                break;
+
+            // add
+            case 1:
                 registers[code[pc + 3]] =
                     code[pc + 3] == 0
                         ? 0
                         : registers[code[pc + 1]] + registers[code[pc + 2]];
-                break;
-            // addi
-            case 1:
-                registers[code[pc + 3]] =
-                    code[pc + 3] == 0 ? 0
-                                      : code[pc + 1] + registers[code[pc + 2]];
                 break;
 
             // sub
@@ -43,69 +43,50 @@ void cpu(int* code) {
                         ? 0
                         : registers[code[pc + 1]] - registers[code[pc + 2]];
                 break;
-            // subi
-            case 3:
-                registers[code[pc + 3]] =
-                    code[pc + 3] == 0 ? 0
-                                      : code[pc + 1] - registers[code[pc + 2]];
-                break;
 
             // and
-            case 4:
+            case 3:
                 registers[code[pc + 3]] =
                     code[pc + 3] == 0
                         ? 0
                         : registers[code[pc + 1]] & registers[code[pc + 2]];
                 break;
-            // andi
-            case 5:
-                registers[code[pc + 3]] =
-                    code[pc + 3] == 0 ? 0
-                                      : code[pc + 1] & registers[code[pc + 2]];
-                break;
 
             // or
-            case 6:
+            case 4:
                 registers[code[pc + 3]] =
                     code[pc + 3] == 0
                         ? 0
                         : registers[code[pc + 1]] | registers[code[pc + 2]];
                 break;
-            // ori
-            case 7:
-                registers[code[pc + 3]] =
-                    code[pc + 3] == 0 ? 0
-                                      : code[pc + 1] | registers[code[pc + 2]];
-                break;
 
             // xor
-            case 8:
+            case 5:
                 registers[code[pc + 3]] =
                     code[pc + 3] == 0
                         ? 0
                         : registers[code[pc + 1]] ^ registers[code[pc + 2]];
                 break;
-            // xori
-            case 9:
-                registers[code[pc + 3]] =
-                    code[pc + 3] == 0 ? 0
-                                      : code[pc + 1] ^ registers[code[pc + 2]];
-                break;
 
             // store
-            case 10:
-                memory[(code[pc + 2] << 8) + code[pc + 3]] =
-                    registers[code[pc + 1]];
+            case 6:
+                code[(code[pc + 2] << 16) + (code[pc + 3] << 8) +
+                     code[pc + 4]] = registers[code[pc + 1]];
+                pc += 5;
+                continue;
                 break;
             // load
-            case 11:
+            case 7:
                 registers[code[pc + 1]] =
                     code[pc + 1] == 0
                         ? 0
-                        : memory[(code[pc + 2] << 8) + code[pc + 3]];
+                        : code[(code[pc + 2] << 16) + (code[pc + 3] << 8) +
+                               code[pc + 4]];
+                pc += 5;
+                continue;
                 break;
             // adr
-            case 12:
+            case 8:
                 registers[code[pc + 1]] =
                     code[pc + 1] == 0 ? 0
                                       : (code[pc + 2] << 16) +
@@ -115,13 +96,11 @@ void cpu(int* code) {
                 break;
 
             // push
-            case 13:
+            case 9:
                 PushIntStack(&stack, registers[code[pc + 1]]);
-                pc += 2;
-                continue;
                 break;
             // pop
-            case 14:
+            case 10:
                 printf("");  // WHY DOES THE COMPILER YELL AT ME IF I
                              // DON'T INCLUDE THIS
                 int* temp = malloc(sizeof(int));
@@ -132,8 +111,15 @@ void cpu(int* code) {
                 }
                 registers[code[pc + 1]] = code[pc + 1] == 0 ? 0 : *temp;
                 free(temp);
-                pc += 2;
-                continue;
+                break;
+
+            // inc
+            case 11:
+                registers[code[pc + 1]]++;
+                break;
+            // dec
+            case 12:
+                registers[code[pc + 1]]--;
                 break;
 
             // syscall/ecall/svc 0
@@ -144,6 +130,7 @@ void cpu(int* code) {
                     case 1:
                         printf("");  // WHY DOES THE COMPILER YELL AT ME IF I
                                      // DON'T INCLUDE THIS
+
                         char* str = malloc(sizeof(char) * registers[3]);
                         int* i = malloc(sizeof(int));
                         *i = 0;
@@ -153,8 +140,24 @@ void cpu(int* code) {
                                 code[pc + difference(pc, registers[2]) + (*i)];
                             (*i)++;
                         }
-
                         printf("%s", str);
+                        free(str);
+                        free(i);
+                        break;
+                    case 2:
+                        printf("");  // WHY DOES THE COMPILER YELL AT ME IF I
+                                     // DON'T INCLUDE THIS
+                        str = malloc(sizeof(char) * (registers[3] + 1));
+                        i = malloc(sizeof(int));
+                        *i = 0;
+
+                        fgets(str, sizeof(char) * (registers[3] + 1), stdin);
+
+                        while (*i < registers[3]) {
+                            code[pc + difference(pc, registers[2]) + (*i)] =
+                                str[*i];
+                            (*i)++;
+                        }
                         free(str);
                         free(i);
                         break;
@@ -168,9 +171,6 @@ void cpu(int* code) {
         }
         pc += INSTRUCTION_SIZE;
     }
-
-    // printf("r0: %d, r1: %d, r2: %d, r3: %d\n", registers[0], registers[1],
-    //        registers[2], registers[3]);
 }
 
 int main(int argc, char* argv[]) {

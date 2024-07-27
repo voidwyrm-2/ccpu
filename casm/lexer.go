@@ -7,7 +7,7 @@ import (
 )
 
 func validForIdent(char rune) bool {
-	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || char == '_'
+	return (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z') || (char >= '0' && char <= '9') || char == '_'
 }
 
 type Lexer struct {
@@ -47,10 +47,10 @@ func (l *Lexer) Lex() ([]Token, error) {
 			l.advance()
 			tokens = append(tokens, l.collectString())
 		default:
-			if validForIdent(l.cchar) {
-				tokens = append(tokens, l.collectInstruction(false))
-			} else if l.cchar >= '0' && l.cchar <= '9' {
+			if l.cchar >= '0' && l.cchar <= '9' {
 				tokens = append(tokens, l.collectImmediate(false))
+			} else if validForIdent(l.cchar) {
+				tokens = append(tokens, l.collectInstruction(false))
 			} else {
 				return []Token{}, fmt.Errorf("(line %d, col %d) illegal character '%c'", l.ln, l.idx+1, l.cchar)
 			}

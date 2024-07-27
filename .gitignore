@@ -1,6 +1,15 @@
+# binaries
 ccpu
 rasm/target
+
+# I hate you both
 .vscode
 **/.DS_Store
+
+# my utility scripts
 run.sh
 commit.sh
+buildall.sh
+
+# no reason to have these in the repo
+asm/**.bin

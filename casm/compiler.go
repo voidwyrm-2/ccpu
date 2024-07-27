@@ -64,7 +64,7 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 	for i < len(tokens) {
 		if tokens[i].Istype(INSTRUCTION) {
 			switch tokens[i].Lit {
-			case "addi", "subi", "andi", "ori", "xori": // 3 inputs; 2 register calls, 1 immediate(1:1:1:1 bytes)
+			case "mov": // 2 inputs; 1 immediate, 1 register call(1:2:1 bytes)
 				if len(tokens)-i < 3 {
 					return []byte{}, Errf(tokens[i], "expected '%s [src1], [src2], [dst]'", tokens[i].Lit)
 				}
@@ -75,19 +75,20 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 					return []byte{}, Errf(tokens[i+2], "expected ',', but found '%s' instead", tokens[i+2].Lit)
 				} else if !tokens[i+3].Istype(REGCALL) {
 					return []byte{}, Errf(tokens[i+3], "expected register call, but found '%s' instead", tokens[i+3].Lit)
-				} else if !tokens[i+4].Istype(COMMA) {
-					return []byte{}, Errf(tokens[i+4], "expected ',', but found '%s' instead", tokens[i+4].Lit)
-				} else if !tokens[i+5].Istype(REGCALL) {
-					return []byte{}, Errf(tokens[i+5], "expected register call, but found '%s' instead", tokens[i+5].Lit)
 				}
+
+				imm := Assert(strconv.Atoi(tokens[i+1].Lit))
+
+				p1 := imm & 65280
+				p2 := imm & 255
 
 				out = append(out,
 					byte(slices.Index(INSTRUCTIONS, tokens[i].Lit)),
-					byte(Assert(strconv.Atoi(tokens[i+1].Lit))),
+					byte(p1),
+					byte(p2),
 					byte(Assert(strconv.Atoi(tokens[i+3].Lit))),
-					byte(Assert(strconv.Atoi(tokens[i+5].Lit))),
 				)
-				i += 6
+				i += 4
 			case "add", "sub", "and", "or", "xor": // 3 inputs; 3 register calls(1:1:1:1 bytes)
 				if len(tokens)-i < 3 {
 					return []byte{}, Errf(tokens[i], "expected '%s [src1], [src2], [dst]'", tokens[i].Lit)
@@ -112,8 +113,8 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 					byte(Assert(strconv.Atoi(tokens[i+5].Lit))),
 				)
 				i += 6
-			case "store", "load": // 2 inputs(1:1:2 bytes)
-				if len(tokens)-i < 2 {
+			case "store", "load", "adr": // 2 inputs(1:1:3 bytes)
+				if len(tokens)-i < 3 {
 					return []byte{}, Errf(tokens[i], "expected '%s [src/dst], [address]'", tokens[i].Lit)
 				}
 
@@ -121,49 +122,24 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 					return []byte{}, Errf(tokens[i], "expected register call, but found '%s' instead", tokens[i].Lit)
 				} else if !tokens[i+2].Istype(COMMA) {
 					return []byte{}, Errf(tokens[i+2], "expected ',', but found '%s' instead", tokens[i+2].Lit)
-				} else if !tokens[i+3].Istype(IMMEDIATE) {
-					return []byte{}, Errf(tokens[i+1], "expected immediate, but found '%s' instead", tokens[i+1].Lit)
-				}
-
-				address := Assert(strconv.Atoi(tokens[i+3].Lit))
-
-				p1 := address & 65280
-				p2 := address & 255
-
-				out = append(out,
-					byte(slices.Index(INSTRUCTIONS, tokens[i].Lit)),
-					byte(Assert(strconv.Atoi(tokens[i+1].Lit))),
-					byte(p1),
-					byte(p2),
-				)
-				i += 4
-			case "adr": // 2 inputs(1:1:3 bytes)
-				if len(tokens)-i < 2 {
-					return []byte{}, Errf(tokens[i], "expected '%s [src/dst], [label/immediate]'", tokens[i].Lit)
-				}
-
-				if !tokens[i+1].Istype(REGCALL) {
-					return []byte{}, Errf(tokens[i], "expected register call, but found '%s' instead", tokens[i].Lit)
-				} else if !tokens[i+2].Istype(COMMA) {
-					return []byte{}, Errf(tokens[i+2], "expected ',', but found '%s' instead", tokens[i+2].Lit)
 				} else if !tokens[i+3].Istype(IDENT) && !tokens[i+3].Istype(IMMEDIATE) {
-					return []byte{}, Errf(tokens[i+3], "expected immediate or label, but found '%s' instead", tokens[i+3].Lit)
+					return []byte{}, Errf(tokens[i+3], "expected address, but found '%s' instead", tokens[i+3].Lit)
 				}
 
-				jmpPos := 0
+				addr := 0
 				if tokens[i+3].Istype(IDENT) {
 					if pos, ok := labels[tokens[i+3].Lit]; ok {
-						jmpPos = pos
+						addr = pos
 					} else {
 						return []byte{}, Errf(tokens[i+3], "label '%s' doesn't exist", tokens[i+3].Lit)
 					}
 				} else {
-					jmpPos = Assert(strconv.Atoi(tokens[i+3].Lit))
+					addr = Assert(strconv.Atoi(tokens[i+3].Lit))
 				}
 
-				p1 := jmpPos & 522240
-				p2 := jmpPos & 65280
-				p3 := jmpPos & 255
+				p1 := addr & 522240
+				p2 := addr & 65280
+				p3 := addr & 255
 
 				out = append(out,
 					byte(slices.Index(INSTRUCTIONS, tokens[i].Lit)),
@@ -173,7 +149,7 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 					byte(p3),
 				)
 				i += 4
-			case "push", "pop": // 1 input(1:1 bytes)
+			case "push", "pop", "inc", "dec": // 1 input(1:1 bytes)
 				if len(tokens)-i < 2 {
 					return []byte{}, Errf(tokens[i], "expected '%s [src/dst]'", tokens[i].Lit)
 				}
@@ -270,7 +246,9 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 			case "ascii", "asciz", "ascin":
 				if i+1 >= len(tokens) {
 					return []byte{}, Errf(tokens[i], "expected string")
-				} else if !tokens[i+1].Istype(STRING) {
+				}
+
+				if !tokens[i+1].Istype(STRING) {
 					return []byte{}, Errf(tokens[i+1], "expected string, but found '%s' instead", tokens[i+1].Lit)
 				}
 
@@ -286,6 +264,35 @@ func interpret(tokens_uncleaned []Token) ([]byte, error) {
 					out = append(out, '\n')
 				}
 				if tokens[i].Lit == "asciz" || tokens[i].Lit == "ascin" {
+					out = append(out, 0)
+				}
+				i += 2
+			case "byte":
+				if i+1 >= len(tokens) {
+					return []byte{}, Errf(tokens[i], "expected immediate")
+				}
+
+				if !tokens[i+1].Istype(IMMEDIATE) {
+					return []byte{}, Errf(tokens[i+1], "expected immediate, but found '%s' instead", tokens[i+1].Lit)
+				}
+
+				b := Assert(strconv.Atoi(tokens[i+1].Lit))
+				if b > 255 {
+					return []byte{}, Errf(tokens[i+1], "'%d' is too large for directive 'byte'", b)
+				}
+				out = append(out, byte(b))
+				i += 2
+			case "space":
+				if i+1 >= len(tokens) {
+					return []byte{}, Errf(tokens[i], "expected immediate")
+				}
+
+				if !tokens[i+1].Istype(IMMEDIATE) {
+					return []byte{}, Errf(tokens[i+1], "expected immediate, but found '%s' instead", tokens[i+1].Lit)
+				}
+
+				allocatedBytes := Assert(strconv.Atoi(tokens[i+1].Lit))
+				for range allocatedBytes {
 					out = append(out, 0)
 				}
 				i += 2
